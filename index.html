@@ -3,19 +3,50 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Image Processor Debug</title>
+    <title>Image Processor with Side-by-Side Comparison</title>
+    <style>
+        .image-container {
+            display: flex;
+            justify-content: space-around;
+            flex-wrap: wrap;
+        }
+        .image-box {
+            margin: 10px;
+            text-align: center;
+        }
+        img {
+            max-width: 300px;
+            max-height: 300px;
+            object-fit: contain;
+        }
+    </style>
 </head>
 <body>
-    <h1>Image Processor Debug</h1>
+    <h1>Image Processor with Side-by-Side Comparison</h1>
     <input type="file" id="imageUpload" accept="image/*">
     <button id="processButton">Process Image</button>
     <div id="status"></div>
-    <img id="resultImage" style="display:none; max-width:100%;">
+    <div class="image-container">
+        <div class="image-box">
+            <h3>Original Image</h3>
+            <img id="originalImage" alt="Original Image">
+        </div>
+        <div class="image-box">
+            <h3>Control Net Image</h3>
+            <img id="controlNetImage" alt="Control Net Image">
+        </div>
+        <div class="image-box">
+            <h3>Processed Image</h3>
+            <img id="resultImage" alt="Processed Image">
+        </div>
+    </div>
     <pre id="debugInfo"></pre>
 
     <script>
     document.getElementById('processButton').addEventListener('click', async () => {
         const statusElement = document.getElementById('status');
+        const originalImage = document.getElementById('originalImage');
+        const controlNetImage = document.getElementById('controlNetImage');
         const resultImage = document.getElementById('resultImage');
         const debugInfo = document.getElementById('debugInfo');
         const file = document.getElementById('imageUpload').files[0];
@@ -26,11 +57,12 @@
         }
 
         statusElement.textContent = 'Processing...';
-        resultImage.style.display = 'none';
         debugInfo.textContent = '';
 
         try {
             const base64Image = await fileToBase64(file);
+            originalImage.src = 'data:image/jpeg;base64,' + base64Image;
+            
             debugInfo.textContent += `Image converted to base64. Length: ${base64Image.length}\n`;
             
             const result = await processImage(base64Image);
@@ -39,7 +71,9 @@
             if (result.status === 'succeeded') {
                 statusElement.textContent = 'Processing complete!';
                 resultImage.src = result.output[0];
-                resultImage.style.display = 'block';
+                // Note: We don't have a separate control net image in this workflow,
+                // so we're leaving it blank for now.
+                controlNetImage.src = 'path/to/placeholder/image.jpg';
             } else {
                 statusElement.textContent = 'Processing failed: ' + (result.error || 'Unknown error');
             }
