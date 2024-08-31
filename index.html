@@ -3,19 +3,19 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Image Processor Debug</title>
+    <title>Image Processor</title>
 </head>
 <body>
-    <h1>Image Processor Debug</h1>
+    <h1>Image Processor</h1>
     <input type="file" id="imageUpload" accept="image/*">
     <button id="processButton">Process Image</button>
     <div id="status"></div>
-    <pre id="debugInfo"></pre>
+    <img id="resultImage" style="display:none; max-width:100%;">
 
     <script>
     document.getElementById('processButton').addEventListener('click', async () => {
         const statusElement = document.getElementById('status');
-        const debugElement = document.getElementById('debugInfo');
+        const resultImage = document.getElementById('resultImage');
         const file = document.getElementById('imageUpload').files[0];
 
         if (!file) {
@@ -24,24 +24,26 @@
         }
 
         statusElement.textContent = 'Processing...';
-        debugElement.textContent = '';
+        resultImage.style.display = 'none';
 
         try {
             const base64Image = await fileToBase64(file);
-            debugElement.textContent += `Image converted to base64. Length: ${base64Image.length}\n`;
-            
             const result = await processImage(base64Image);
-            statusElement.textContent = 'Processing complete.';
-            debugElement.textContent += `Result: ${JSON.stringify(result, null, 2)}\n`;
+            
+            if (result.status === 'succeeded') {
+                statusElement.textContent = 'Processing complete!';
+                resultImage.src = result.output[0];
+                resultImage.style.display = 'block';
+            } else {
+                statusElement.textContent = 'Processing failed: ' + result.error;
+            }
         } catch (error) {
             statusElement.textContent = 'Error: ' + error.message;
-            debugElement.textContent += `Error stack: ${error.stack}\n`;
             console.error('Detailed error:', error);
         }
     });
 
     async function processImage(base64Image) {
-        debugElement.textContent += 'Sending request to Cloudflare Worker...\n';
         const response = await fetch('https://image-processor.i-yasinov.workers.dev/', {
             method: 'POST',
             headers: {
@@ -50,11 +52,7 @@
             body: JSON.stringify({ image: base64Image }),
         });
 
-        debugElement.textContent += `Response status: ${response.status} ${response.statusText}\n`;
-
         if (!response.ok) {
-            const errorText = await response.text();
-            debugElement.textContent += `Error response: ${errorText}\n`;
             throw new Error(`Request failed: ${response.status} ${response.statusText}`);
         }
 
