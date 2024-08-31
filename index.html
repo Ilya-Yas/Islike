@@ -3,219 +3,60 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Image Reimagination</title>
-    <style>
-        body {
-            font-family: Arial, sans-serif;
-            line-height: 1.6;
-            margin: 0;
-            padding: 20px;
-            background-color: #f4f4f4;
-        }
-        .container {
-            max-width: 800px;
-            margin: 0 auto;
-            background-color: #fff;
-            padding: 20px;
-            border-radius: 5px;
-            box-shadow: 0 0 10px rgba(0,0,0,0.1);
-        }
-        h1 {
-            text-align: center;
-            color: #333;
-        }
-        .form-group {
-            margin-bottom: 20px;
-        }
-        label {
-            display: block;
-            margin-bottom: 5px;
-        }
-        input[type="file"], input[type="text"] {
-            width: 100%;
-            padding: 10px;
-            border: 1px solid #ddd;
-            border-radius: 4px;
-        }
-        button {
-            display: block;
-            width: 100%;
-            padding: 10px;
-            background-color: #4CAF50;
-            color: white;
-            border: none;
-            border-radius: 4px;
-            cursor: pointer;
-        }
-        button:hover {
-            background-color: #45a049;
-        }
-        #result {
-            margin-top: 20px;
-            text-align: center;
-        }
-        #resultImage {
-            max-width: 100%;
-            height: auto;
-        }
-        #loading {
-            display: none;
-            text-align: center;
-            margin-top: 20px;
-        }
-        #progress-bar {
-            width: 100%;
-            background-color: #f0f0f0;
-            padding: 3px;
-            border-radius: 3px;
-            box-shadow: inset 0 1px 3px rgba(0, 0, 0, .2);
-        }
-        #progress-bar-fill {
-            display: block;
-            height: 22px;
-            background-color: #659cef;
-            border-radius: 3px;
-            transition: width 500ms ease-in-out;
-        }
-    </style>
+    <title>Image Processor</title>
 </head>
 <body>
-    <div class="container">
-        <h1>Image Reimagination</h1>
-        <form id="uploadForm">
-            <div class="form-group">
-                <label for="imageUpload">Upload an image:</label>
-                <input type="file" id="imageUpload" accept="image/*" required>
-            </div>
-            <div class="form-group">
-                <label for="promptText">Enter prompt (optional):</label>
-                <input type="text" id="promptText" placeholder="Describe the reimagined image">
-            </div>
-            <button type="submit">Process Image</button>
-        </form>
-        <div id="loading">
-            <p>Processing image...</p>
-            <div id="progress-bar">
-                <span id="progress-bar-fill" style="width: 0%;"></span>
-            </div>
-            <p id="status">Initializing...</p>
-            <p id="time-estimate"></p>
-        </div>
-        <div id="result">
-            <img id="resultImage" alt="Processed image will appear here" style="display: none;">
-        </div>
-    </div>
+    <h1>Image Processor</h1>
+    <input type="file" id="imageUpload" accept="image/*">
+    <button id="processButton">Process Image</button>
+    <div id="status"></div>
+
     <script>
-        const REPLICATE_API_TOKEN = 'r8_Be0E6hvTIBTtTnMXa5VgnSUD7XZgiHf41uuE1';
+    document.getElementById('processButton').addEventListener('click', async () => {
+        const statusElement = document.getElementById('status');
+        const file = document.getElementById('imageUpload').files[0];
 
-        document.addEventListener('DOMContentLoaded', function() {
-            const form = document.getElementById('uploadForm');
-            const imageUpload = document.getElementById('imageUpload');
-            const promptText = document.getElementById('promptText');
-            const loading = document.getElementById('loading');
-            const resultImage = document.getElementById('resultImage');
-            const progressBarFill = document.getElementById('progress-bar-fill');
-            const statusElement = document.getElementById('status');
-            const timeEstimateElement = document.getElementById('time-estimate');
+        if (!file) {
+            statusElement.textContent = 'Please select an image file.';
+            return;
+        }
 
-            form.addEventListener('submit', async function(e) {
-                e.preventDefault();
+        statusElement.textContent = 'Processing...';
 
-                const file = imageUpload.files[0];
-                const prompt = promptText.value || 'A reimagined version of the input image';
+        try {
+            const base64Image = await fileToBase64(file);
+            const result = await processImage(base64Image);
+            statusElement.textContent = 'Processing complete. Result: ' + JSON.stringify(result);
+        } catch (error) {
+            statusElement.textContent = 'Error: ' + error.message;
+            console.error('Detailed error:', error);
+        }
+    });
 
-                if (!file) {
-                    alert('Please select an image to upload.');
-                    return;
-                }
-
-                loading.style.display = 'block';
-                resultImage.style.display = 'none';
-                progressBarFill.style.width = '0%';
-                statusElement.textContent = 'Initializing...';
-                timeEstimateElement.textContent = '';
-
-                try {
-                    const result = await processImage(file, prompt);
-                    displayResult(result);
-                } catch (error) {
-                    console.error('Error processing image:', error);
-                    alert('An error occurred while processing the image. Please try again.');
-                } finally {
-                    loading.style.display = 'none';
-                }
-            });
-
-            async function processImage(file, prompt) {
-                const base64Image = await fileToBase64(file);
-                const startTime = Date.now();
-
-                // Create a prediction
-                const createResponse = await fetch('https://api.replicate.com/v1/predictions', {
-                    method: 'POST',
-                    headers: {
-                        'Authorization': `Token ${REPLICATE_API_TOKEN}`,
-                        'Content-Type': 'application/json',
-                    },
-                    body: JSON.stringify({
-                        version: "7d4f5172d83a64a026d2f4856d756e7da2f8b6b51d74bde58146c52ac965db5a",
-                        input: {
-                            image: base64Image,
-                            prompt: prompt,
-                        },
-                    }),
-                });
-
-                const prediction = await createResponse.json();
-                
-                // Check the status of the prediction
-                let progress = 0;
-                while (prediction.status !== 'succeeded' && prediction.status !== 'failed') {
-                    await new Promise(resolve => setTimeout(resolve, 1000));
-                    const statusResponse = await fetch(`https://api.replicate.com/v1/predictions/${prediction.id}`, {
-                        headers: {
-                            'Authorization': `Token ${REPLICATE_API_TOKEN}`,
-                        },
-                    });
-                    const updatedPrediction = await statusResponse.json();
-                    
-                    // Update progress
-                    progress += 5;
-                    progressBarFill.style.width = `${Math.min(progress, 90)}%`;
-                    statusElement.textContent = `Status: ${updatedPrediction.status}`;
-                    
-                    // Estimate time remaining
-                    const elapsedTime = (Date.now() - startTime) / 1000;
-                    const estimatedTotalTime = elapsedTime / (progress / 100);
-                    const remainingTime = Math.max(0, estimatedTotalTime - elapsedTime);
-                    timeEstimateElement.textContent = `Estimated time remaining: ${remainingTime.toFixed(0)} seconds`;
-                    
-                    if (updatedPrediction.status === 'succeeded') {
-                        progressBarFill.style.width = '100%';
-                        return updatedPrediction.output;
-                    }
-                    if (updatedPrediction.status === 'failed') {
-                        throw new Error('Image processing failed');
-                    }
-                }
-
-                throw new Error('Unexpected end of processing');
-            }
-
-            function displayResult(imageUrl) {
-                resultImage.src = imageUrl;
-                resultImage.style.display = 'block';
-            }
-
-            function fileToBase64(file) {
-                return new Promise((resolve, reject) => {
-                    const reader = new FileReader();
-                    reader.readAsDataURL(file);
-                    reader.onload = () => resolve(reader.result.split(',')[1]);
-                    reader.onerror = error => reject(error);
-                });
-            }
+    async function processImage(base64Image) {
+        const response = await fetch('https://image-processor.i-yasinov.workers.dev/', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ image: base64Image }),
         });
+
+        if (!response.ok) {
+            throw new Error(`Request failed: ${response.status} ${response.statusText}`);
+        }
+
+        return await response.json();
+    }
+
+    function fileToBase64(file) {
+        return new Promise((resolve, reject) => {
+            const reader = new FileReader();
+            reader.readAsDataURL(file);
+            reader.onload = () => resolve(reader.result.split(',')[1]);
+            reader.onerror = error => reject(error);
+        });
+    }
     </script>
 </body>
 </html>
